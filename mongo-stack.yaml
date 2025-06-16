@@ -1,0 +1,83 @@
+# Storage class provison on AWS
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: mongo-storage-gp3
+provisioner: kubernetes.io/aws-ebs
+reclaimPolicy: Delete
+allowVolumeExpansion: false
+parameters:
+  type: gp3
+volumeBindingMode: WaitForFirstConsumer
+---
+#Mongo secrets
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongo-secret
+type: Opaque
+data:
+  mongo-root-username: YWRtaW4=        # admin
+  mongo-root-password: YWRtaW4=         # admin
+---
+# Mongo Statefull set with storage
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo
+spec:
+  serviceName: "mongo"
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mongo
+  template:
+    metadata:
+      labels:
+        app: mongo
+    spec:
+      containers:
+      - name: mongo
+        image: mongo:6.0
+        ports:
+        - containerPort: 27017x1
+        command: ["/bin/sh"]
+        args: ["-c", "mongod --replSet=rs0 --bind_ip_all"]
+      env:
+        name: MONGO_INITDB_ROOT_USERNAME
+        valueFrom:
+          secretKeyRef:
+            name: mongo-secret
+            key: mongo-root-username
+        name: MONGO_INITDB_ROOT_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: mongo-secret
+            key: mongo-root-password:
+        volumeMounts:
+        - name: mongo-data
+          mountPath: /data/db
+  volumeClaimTemplates:
+  - metadata:
+      name: mongo-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: mongo-storage-gp3  # or gp3
+      resources:
+        requests:
+          storage: 500Mi
+# Mongo Service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo
+  labels:
+    app: mongo
+spec:
+  ports:
+  - port: 27017
+    name: mongo
+  clusterIP: None  # Headless service
+  selector:
+    app: mongo
