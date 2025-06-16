@@ -40,7 +40,7 @@ spec:
       - name: mongo
         image: mongo:6.0
         ports:
-        - containerPort: 27017x1
+        - containerPort: 27017
         command: ["/bin/sh"]
         args: ["-c", "mongod --replSet=rs0 --bind_ip_all"]
       env:
